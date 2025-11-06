@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="light">
+    <!-- Fixed Header -->
+    <header class="fixed-header">
+        <div class="header-main">
+            <div class="header-content">
+                <div class="header-icon">
+                    <i class="fas fa-users" id="header-icon"></i>
+                </div>
+                <h1 id="header-title">Add Customer</h1>
+            </div>
+            <div class="theme-toggle">
+                <button class="theme-btn" onclick="toggleTheme()">
+                    <i class="fas fa-moon" id="theme-icon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <!-- Add Customer Section -->
+            <section id="add-customer" class="section active">
+                <form id="customer-form" class="customer-form">
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="name" placeholder="Customer Name" required>
+                    </div>
+
+                    <div class="input-group">
+                        <i class="fas fa-mobile-alt"></i>
+                        <input type="tel" id="mobile" placeholder="10-digit Mobile Number" pattern="[0-9]{10}" required>
+                    </div>
+
+                    <div class="input-group">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <textarea id="address" placeholder="Complete Address" required></textarea>
+                    </div>
+
+                    <!-- Location Services -->
+                    <div class="location-section">
+                        <button type="button" class="location-btn" onclick="getCurrentLocation()">
+                            <i class="fas fa-location-crosshairs"></i>
+                            Use My Current Location
+                        </button>
+                        <div id="location-status" class="location-status"></div>
+                    </div>
+
+                    <!-- Map URL Section -->
+                    <div class="map-url-section">
+                        <div class="section-label">
+                            <i class="fas fa-link"></i>
+                            Google Maps URL
+                        </div>
+                        <div class="url-input-group">
+                            <input type="url" id="map-url" placeholder="Paste Google Maps URL">
+                            <button type="button" class="url-btn" onclick="extractCoordinatesFromURL()">
+                                <i class="fas fa-magic"></i>
+                                Extract
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Manual Coordinates -->
+                    <div class="manual-section">
+                        <button type="button" class="manual-coordinate-btn" onclick="showManualCoordinateInput()">
+                            <i class="fas fa-keyboard"></i>
+                            Enter Coordinates Manually
+                        </button>
+                    </div>
+
+                    <div class="input-group">
+                        <i class="fas fa-location-dot"></i>
+                        <input type="text" id="coordinates" placeholder="Coordinates (auto-filled)">
+                    </div>
+
+                    <!-- Photo Upload -->
+                    <div class="photo-section">
+                        <div class="section-label">
+                            <i class="fas fa-camera"></i>
+                            Home Photos (Max 5)
+                        </div>
+                        <div class="photo-input-container">
+                            <input type="file" id="photo-input" accept="image/*" multiple 
+                                   onchange="handlePhotoUpload(this.files)" style="display: none;">
+                            <button type="button" class="manual-coordinate-btn" onclick="document.getElementById('photo-input').click()">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                Upload Photos
+                            </button>
+                        </div>
+                        <div id="photo-preview-container" class="photo-preview-container">
+                            <div class="no-photos">No photos added</div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn">
+                        <i class="fas fa-plus"></i>
+                        Add Customer
+                    </button>
+                </form>
+                <button type="button" class="clear-btn" onclick="clearForm()">
+                    <i class="fas fa-broom"></i>
+                    Clear Form
+                </button>
+            </section>
+
+            <!-- View Customers Section -->
+            <section id="view-customers" class="section">
+                <!-- Search Bar -->
+                <div class="search-container">
+                    <div class="input-group">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="customer-search" placeholder="Search customers by name, mobile, or address..." oninput="searchCustomers()">
+                        <button class="clear-search-btn" onclick="clearSearch()" style="display: none;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="search-stats" id="search-stats">
+                        <!-- Search results count will appear here -->
+                    </div>
+                </div>
+
+                <div id="customers-list" class="customers-list">
+                    <!-- Customer cards will be dynamically inserted here -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-btn active" onclick="showSection('add-customer')">
+            <i class="fas fa-user-plus"></i>
+            Add
+        </button>
+        <button class="nav-btn" onclick="showSection('view-customers')">
+            <i class="fas fa-users"></i>
+            Customers
+            <span class="nav-count" id="nav-customer-count">0</span>
+        </button>
+    </nav>
+
+    <!-- Action Sheet -->
+    <div id="action-sheet" class="action-sheet">
+        <div class="action-sheet-content">
+            <div class="action-header">
+                <h3 id="action-title">Contact Customer</h3>
+                <button class="close-btn" onclick="closeActionSheet()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="action-number">
+                <i class="fas fa-mobile-alt"></i>
+                <span id="action-number">+91-XXXXXXXXXX</span>
+            </div>
+            <div class="action-buttons">
+                <button class="action-btn call-btn" onclick="callNumber()">
+                    <i class="fas fa-phone"></i>
+                    Call
+                </button>
+                <button class="action-btn whatsapp-btn" onclick="sendWhatsApp()">
+                    <i class="fab fa-whatsapp"></i>
+                    WhatsApp
+                </button>
+                <button class="action-btn contact-btn" onclick="saveToContacts()">
+                    <i class="fas fa-address-book"></i>
+                    Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Modal -->
+    <div id="photo-modal" class="photo-modal">
+        <div class="modal-content">
+            <img id="modal-photo" class="modal-photo" src="" alt="Customer photo">
+            <button class="modal-close" onclick="closePhotoModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
