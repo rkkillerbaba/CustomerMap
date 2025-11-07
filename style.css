@@ -1490,3 +1490,465 @@ input, textarea {
         animation: none !important;
     }
 }
+/* === BACKUP SYSTEM STYLES === */
+
+.backup-status {
+    padding: 12px 16px;
+    margin: 15px 0;
+    border-radius: 12px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+    display: none;
+    border: 2px solid transparent;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.backup-status.success {
+    background: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+    display: block;
+}
+
+.backup-status.error {
+    background: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+    display: block;
+}
+
+.backup-status.warning {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+    display: block;
+}
+
+[data-theme="dark"] .backup-status.success {
+    background: #1e4620;
+    color: #a5d6a7;
+    border-color: #2e7d32;
+}
+
+[data-theme="dark"] .backup-status.error {
+    background: #4a1c1c;
+    color: #ef9a9a;
+    border-color: #c62828;
+}
+
+[data-theme="dark"] .backup-status.warning {
+    background: #3e2e00;
+    color: #ffd54f;
+    border-color: #ff8f00;
+}
+
+/* Backup Controls */
+.backup-controls {
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    padding: 16px;
+    margin: 20px 0;
+    border: 1px solid var(--border-color);
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.backup-controls button {
+    flex: 1;
+    min-width: 100px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    color: white;
+}
+
+.backup-controls button:active {
+    transform: scale(0.95);
+}
+
+.sync-btn {
+    background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.sync-btn:active {
+    background: linear-gradient(135deg, #218838, #1ea085);
+}
+
+.export-btn {
+    background: linear-gradient(135deg, #17a2b8, #6f42c1);
+}
+
+.export-btn:active {
+    background: linear-gradient(135deg, #138496, #5a359c);
+}
+
+.import-btn {
+    background: linear-gradient(135deg, #6c757d, #495057);
+}
+
+.import-btn:active {
+    background: linear-gradient(135deg, #5a6268, #343a40);
+}
+
+/* Customer Sync Status in Cards */
+.customer-card.synced {
+    border-left: 4px solid #28a745;
+    background: linear-gradient(to right, rgba(40, 167, 69, 0.05), transparent);
+}
+
+.customer-card.not-synced {
+    border-left: 4px solid #ffc107;
+    background: linear-gradient(to right, rgba(255, 193, 7, 0.05), transparent);
+}
+
+[data-theme="dark"] .customer-card.synced {
+    background: linear-gradient(to right, rgba(40, 167, 69, 0.1), transparent);
+}
+
+[data-theme="dark"] .customer-card.not-synced {
+    background: linear-gradient(to right, rgba(255, 193, 7, 0.1), transparent);
+}
+
+/* Sync Status Badge */
+.sync-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.sync-badge.synced {
+    background: #d4edda;
+    color: #155724;
+}
+
+.sync-badge.not-synced {
+    background: #fff3cd;
+    color: #856404;
+}
+
+[data-theme="dark"] .sync-badge.synced {
+    background: #1e4620;
+    color: #a5d6a7;
+}
+
+[data-theme="dark"] .sync-badge.not-synced {
+    background: #3e2e00;
+    color: #ffd54f;
+}
+
+/* Backup Progress */
+.backup-progress {
+    width: 100%;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    margin: 8px 0;
+    overflow: hidden;
+}
+
+.backup-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+/* Cloud Icon Animation */
+.cloud-icon {
+    animation: floatCloud 3s ease-in-out infinite;
+}
+
+@keyframes floatCloud {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+/* Responsive Backup Controls */
+@media (max-width: 480px) {
+    .backup-controls {
+        flex-direction: column;
+    }
+    
+    .backup-controls button {
+        min-width: auto;
+        padding: 14px 16px;
+    }
+    
+    .backup-status {
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+}
+
+/* Backup Stats */
+.backup-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.stat-value {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.stat-label {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+/* Online/Offline Indicator */
+.online-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.online-indicator.online {
+    background: #d4edda;
+    color: #155724;
+}
+
+.online-indicator.offline {
+    background: #fff3cd;
+    color: #856404;
+}
+
+[data-theme="dark"] .online-indicator.online {
+    background: #1e4620;
+    color: #a5d6a7;
+}
+
+[data-theme="dark"] .online-indicator.offline {
+    background: #3e2e00;
+    color: #ffd54f;
+}
+
+/* Pulse animation for sync button when there's unsynced data */
+.sync-btn.pulse {
+    animation: pulseWarning 2s infinite;
+}
+
+@keyframes pulseWarning {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+    }
+}
+
+/* Loading state for backup buttons */
+.backup-controls button.loading {
+    position: relative;
+    color: transparent;
+}
+
+.backup-controls button.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Enhanced customer card with backup info */
+.customer-backup-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.backup-timestamp {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.backup-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.backup-action-btn {
+    background: none;
+    border: none;
+    color: var(--accent-color);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+.backup-action-btn:hover {
+    background: var(--bg-tertiary);
+}
+
+/* File input for import */
+#import-file-input {
+    display: none;
+}
+
+/* Export/Import Success Animation */
+.export-success, .import-success {
+    animation: bounceIn 0.6s ease;
+}
+
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.3);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Backup Section Header */
+.backup-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.backup-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.backup-section-title i {
+    color: var(--accent-color);
+}
+
+/* Last Sync Info */
+.last-sync-info {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    margin: 8px 0;
+}
+
+/* Storage Usage */
+.storage-usage {
+    margin: 16px 0;
+}
+
+.storage-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 8px 0;
+}
+
+.storage-used {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.storage-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Backup Tips */
+.backup-tips {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 16px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.backup-tips ul {
+    margin: 8px 0;
+    padding-left: 16px;
+}
+
+.backup-tips li {
+    margin: 4px 0;
+}
