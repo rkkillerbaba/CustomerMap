@@ -1,3 +1,18 @@
+// ==================== FIREBASE CONFIGURATION ====================
+const firebaseConfig = {
+    apiKey: "AIzaSyBnYPq1d_YkZBqnxQgs1ggPOVi8czSJJpg",
+    authDomain: "custome-7ffe9.firebaseapp.com",
+    databaseURL: "https://custome-7ffe9-default-rtdb.firebaseio.com",
+    projectId: "custome-7ffe9",
+    storageBucket: "custome-7ffe9.firebasestorage.app",
+    messagingSenderId: "358444673079",
+    appId: "1:358444673079:web:cc2cc41959ba26f3c1f7b2"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
 // ==================== DATA STORAGE SYSTEM ====================
 const STORAGE_KEY = 'customerManagerData';
 let customers = [];
@@ -5,11 +20,13 @@ let currentMobileNumber = '';
 let currentCustomerName = '';
 let uploadedPhotos = [];
 let currentSearchTerm = '';
+let isOnline = navigator.onLine;
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
     loadCustomers();
     initializeTheme();
+    setupOnlineListener();
     
     // Add drag and drop for photos
     const photoInput = document.getElementById('photo-input');
@@ -33,35 +50,293 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Load customers from localStorage
-function loadCustomers() {
+// ==================== BACKUP SYSTEM ====================
+
+// Online/Offline detection
+function setupOnlineListener() {
+    window.addEventListener('online', () => {
+        isOnline = true;
+        showBackupStatus('🌐 Online - Syncing data...', 'success');
+        syncOfflineData();
+        updateOnlineIndicator();
+    });
+
+    window.addEventListener('offline', () => {
+        isOnline = false;
+        showBackupStatus('📱 Offline - Saving locally', 'warning');
+        updateOnlineIndicator();
+    });
+
+    updateOnlineIndicator();
+}
+
+// Update online indicator
+function updateOnlineIndicator() {
+    const onlineIndicator = document.querySelector('.online-indicator') || createOnlineIndicator();
+    onlineIndicator.textContent = isOnline ? '🌐 Online' : '📱 Offline';
+    onlineIndicator.className = `online-indicator ${isOnline ? 'online' : 'offline'}`;
+}
+
+// Create online indicator
+function createOnlineIndicator() {
+    const indicator = document.createElement('div');
+    indicator.className = 'online-indicator online';
+    document.querySelector('.header-content').appendChild(indicator);
+    return indicator;
+}
+
+// Save customer with backup
+async function saveCustomerWithBackup(customerData) {
+    // Add sync metadata
+    customerData.synced = false;
+    customerData.lastSyncAttempt = new Date().toISOString();
+    
+    // Try Firebase first if online
+    if (isOnline) {
+        const saved = await saveToFirebase(customerData);
+        if (saved) {
+            customerData.synced = true;
+        }
+    }
+    
+    // Always save locally
+    saveToLocalStorage(customerData);
+    return customerData;
+}
+
+// Save to Firebase
+async function saveToFirebase(customerData) {
+    try {
+        const customerId = customerData.id.toString();
+        await database.ref('customers/' + customerId).set(customerData);
+        console.log('✅ Saved to Firebase:', customerData.name);
+        return true;
+    } catch (error) {
+        console.error('❌ Firebase save failed:', error);
+        return false;
+    }
+}
+
+// Save to Local Storage
+function saveToLocalStorage(customerData) {
+    const existingIndex = customers.findIndex(c => c.id === customerData.id);
+    
+    if (existingIndex !== -1) {
+        customers[existingIndex] = customerData;
+    } else {
+        customers.push(customerData);
+    }
+    
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+    displayCustomers();
+    updateCustomerCount();
+}
+
+// Load customers with Firebase sync
+async function loadCustomers() {
+    // First load from local storage
     const storedData = localStorage.getItem(STORAGE_KEY);
     
     if (storedData) {
         customers = JSON.parse(storedData);
     } else {
         // Sample data for first time users
-        customers = [
-            {
-                id: 1,
-                name: "Demo Customer",
-                mobile: "1234567890",
-                address: "Sample Address, City, State",
-                coordinates: "23.15371, 79.753135",
-                mapUrl: "https://maps.google.com/?q=23.15371,79.753135",
-                photos: []
-            }
-        ];
-        saveCustomersToStorage();
+        customers = [{
+            id: 1,
+            name: "Demo Customer",
+            mobile: "1234567890",
+            address: "Sample Address, City, State",
+            coordinates: "23.15371, 79.753135",
+            mapUrl: "https://maps.google.com/?q=23.15371,79.753135",
+            photos: [],
+            synced: false,
+            created: new Date().toISOString()
+        }];
+        saveToLocalStorage(customers[0]);
+    }
+    
+    // Try to sync with Firebase if online
+    if (isOnline) {
+        await syncFromFirebase();
     }
     
     displayCustomers();
     updateCustomerCount();
 }
 
-// Save customers to localStorage
-function saveCustomersToStorage() {
+// Sync from Firebase
+async function syncFromFirebase() {
+    try {
+        const snapshot = await database.ref('customers').once('value');
+        const firebaseCustomers = snapshot.val();
+        
+        if (firebaseCustomers) {
+            const remoteCustomers = Object.values(firebaseCustomers);
+            
+            // Merge local and remote data
+            remoteCustomers.forEach(remoteCustomer => {
+                const localIndex = customers.findIndex(c => c.id === remoteCustomer.id);
+                
+                if (localIndex === -1) {
+                    // New customer from cloud
+                    customers.push({...remoteCustomer, synced: true});
+                } else {
+                    // Update existing customer with cloud data
+                    customers[localIndex] = {...customers[localIndex], ...remoteCustomer, synced: true};
+                }
+            });
+            
+            // Save merged data locally
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+            showBackupStatus('✅ Cloud data synced!', 'success');
+        }
+    } catch (error) {
+        console.error('Firebase sync failed:', error);
+    }
+}
+
+// Sync offline data to cloud
+async function syncOfflineData() {
+    if (!isOnline) {
+        showBackupStatus('📱 Offline - Cannot sync', 'warning');
+        return;
+    }
+
+    const unsyncedCustomers = customers.filter(c => !c.synced);
+    
+    if (unsyncedCustomers.length === 0) {
+        showBackupStatus('✅ All data synced with cloud!', 'success');
+        return;
+    }
+
+    showBackupStatus(`🔄 Syncing ${unsyncedCustomers.length} customers...`, 'warning');
+    
+    let syncedCount = 0;
+    let failedCount = 0;
+
+    for (const customer of unsyncedCustomers) {
+        try {
+            await saveToFirebase(customer);
+            customer.synced = true;
+            syncedCount++;
+        } catch (error) {
+            failedCount++;
+            console.error('Failed to sync:', customer.name, error);
+        }
+    }
+
+    // Update local storage
     localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+    displayCustomers();
+
+    if (failedCount === 0) {
+        showBackupStatus(`✅ ${syncedCount} customers synced to cloud!`, 'success');
+    } else {
+        showBackupStatus(`⚠️ ${syncedCount} synced, ${failedCount} failed`, 'warning');
+    }
+}
+
+// Export data to JSON file
+function exportData() {
+    const data = {
+        customers: customers,
+        exportDate: new Date().toISOString(),
+        totalCustomers: customers.length,
+        syncedCount: customers.filter(c => c.synced).length
+    };
+
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `customer_backup_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    
+    showBackupStatus('📤 Backup file downloaded!', 'success');
+}
+
+// Import data from JSON file
+function importData() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json';
+    fileInput.id = 'import-file-input';
+    
+    fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const importedData = JSON.parse(event.target.result);
+                const importedCustomers = importedData.customers || [];
+                
+                if (importedCustomers.length === 0) {
+                    showBackupStatus('❌ No valid customer data found', 'error');
+                    return;
+                }
+
+                // Merge with existing data
+                importedCustomers.forEach(importedCustomer => {
+                    const existingIndex = customers.findIndex(c => c.id === importedCustomer.id);
+                    
+                    if (existingIndex === -1) {
+                        // Add new customer with sync false
+                        customers.push({
+                            ...importedCustomer,
+                            synced: false,
+                            lastSyncAttempt: new Date().toISOString()
+                        });
+                    }
+                    // If exists, keep existing data (no overwrite)
+                });
+
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+                displayCustomers();
+                
+                showBackupStatus(`📥 ${importedCustomers.length} customers imported!`, 'success');
+                
+                // Auto-sync new data
+                setTimeout(() => syncOfflineData(), 1000);
+                
+            } catch (error) {
+                showBackupStatus('❌ Invalid backup file', 'error');
+            }
+        };
+        reader.readAsText(file);
+    };
+    
+    fileInput.click();
+}
+
+// Show backup status
+function showBackupStatus(message, type) {
+    const statusDiv = document.getElementById('backupStatus');
+    statusDiv.textContent = message;
+    statusDiv.className = `backup-status ${type}`;
+    
+    // Update sync button if there are unsynced customers
+    updateSyncButton();
+    
+    setTimeout(() => {
+        statusDiv.style.display = 'none';
+    }, 5000);
+}
+
+// Update sync button state
+function updateSyncButton() {
+    const syncBtn = document.querySelector('.sync-btn');
+    const unsyncedCount = customers.filter(c => !c.synced).length;
+    
+    if (unsyncedCount > 0) {
+        syncBtn.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Sync (${unsyncedCount})`;
+        syncBtn.classList.add('pulse');
+    } else {
+        syncBtn.innerHTML = `<i class="fas fa-cloud-upload-alt"></i> Sync to Cloud`;
+        syncBtn.classList.remove('pulse');
+    }
 }
 
 // ==================== SEARCH FUNCTIONALITY ====================
@@ -130,101 +405,7 @@ function displayFilteredCustomers(filteredCustomers, searchTerm) {
     customersList.innerHTML = '';
     
     filteredCustomers.forEach(customer => {
-        const customerCard = document.createElement('div');
-        customerCard.className = 'customer-card';
-        
-        // Highlight matching text in customer data
-        const highlightedName = highlightText(customer.name, searchTerm);
-        const highlightedMobile = highlightText(customer.mobile, searchTerm);
-        const highlightedAddress = highlightText(customer.address, searchTerm);
-        const highlightedCoordinates = customer.coordinates ? highlightText(customer.coordinates, searchTerm) : customer.coordinates;
-        
-        // Create photos section HTML
-        let photosHTML = '';
-        if (customer.photos && customer.photos.length > 0) {
-            photosHTML = `
-                <div class="photo-section">
-                    <div class="section-label">
-                        <i class="fas fa-camera"></i>
-                        Home Photos (${customer.photos.length})
-                    </div>
-                    <div class="photo-preview-container">
-                        ${customer.photos.map(photo => `
-                            <div class="photo-preview" onclick="openPhotoModal('${photo.dataUrl}')">
-                                <img src="${photo.dataUrl}" alt="Customer home">
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Create map URL section if available
-        let mapUrlHTML = '';
-        if (customer.mapUrl) {
-            mapUrlHTML = `
-                <div class="info-row">
-                    <i class="fas fa-link"></i>
-                    <div class="info-content">
-                        <a href="${customer.mapUrl}" target="_blank" class="map-link">
-                            <i class="fas fa-external-link-alt"></i>
-                            Open Map URL
-                        </a>
-                    </div>
-                </div>
-            `;
-        }
-        
-        customerCard.innerHTML = `
-            <div class="customer-header">
-                <i class="fas fa-user-tie"></i>
-                <div class="customer-name">${highlightedName}</div>
-                <button class="share-btn" onclick="showShareMenu(${customer.id})">
-                    <i class="fas fa-share-alt"></i>
-                    Share
-                </button>
-            </div>
-            
-            <div class="customer-info">
-                <div class="info-row">
-                    <i class="fas fa-mobile-alt"></i>
-                    <div class="info-content">
-                        <div class="mobile-clickable" onclick="showActionSheet('${customer.name}', '${customer.mobile}')">
-                            +91-${highlightedMobile}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="info-row">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <div class="info-content">${highlightedAddress}</div>
-                </div>
-                
-                <div class="info-row">
-                    <i class="fas fa-location-dot"></i>
-                    <div class="info-content">${highlightedCoordinates}</div>
-                </div>
-                
-                ${mapUrlHTML}
-            </div>
-            
-            ${photosHTML}
-            
-            <div class="card-actions">
-                <button class="card-btn map-btn" onclick="viewOnMap('${customer.coordinates}')">
-                    <i class="fas fa-map"></i>
-                    Map
-                </button>
-                <button class="card-btn edit-btn" onclick="editCustomer(${customer.id})">
-                    <i class="fas fa-edit"></i>
-                    Edit
-                </button>
-                <button class="card-btn delete-btn" onclick="deleteCustomer(${customer.id})">
-                    <i class="fas fa-trash"></i>
-                    Delete
-                </button>
-            </div>
-        `;
+        const customerCard = createCustomerCard(customer, searchTerm);
         customersList.appendChild(customerCard);
     });
 }
@@ -288,7 +469,7 @@ function clearSearch() {
 // ==================== CUSTOMER MANAGEMENT ====================
 
 // Customer form submission
-document.getElementById('customer-form').addEventListener('submit', function(e) {
+document.getElementById('customer-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const name = document.getElementById('name').value.trim();
@@ -322,15 +503,16 @@ document.getElementById('customer-form').addEventListener('submit', function(e) 
         coordinates: coordinates || 'Not provided',
         mapUrl: mapUrl || (coordinates !== 'Not provided' ? `https://maps.google.com/?q=${coordinates}` : ''),
         photos: [...uploadedPhotos],
-        created: new Date().toISOString()
+        created: new Date().toISOString(),
+        synced: false,
+        lastSyncAttempt: new Date().toISOString()
     };
     
-    customers.push(newCustomer);
-    saveCustomersToStorage();
-    displayCustomers();
-    this.reset();
+    // Save with backup system
+    await saveCustomerWithBackup(newCustomer);
     
-    // Clear uploaded photos
+    // Reset form
+    this.reset();
     uploadedPhotos = [];
     updatePhotoPreviews();
     
@@ -355,7 +537,7 @@ function editCustomer(id) {
         
         // Remove from current list
         customers = customers.filter(c => c.id !== id);
-        saveCustomersToStorage();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
         displayCustomers();
         
         // Switch to add section and update button
@@ -370,10 +552,159 @@ function editCustomer(id) {
 // Delete customer function
 function deleteCustomer(id) {
     if (confirm('Are you sure you want to delete this customer? This action cannot be undone.')) {
+        // Remove from Firebase if online and synced
+        const customer = customers.find(c => c.id === id);
+        if (isOnline && customer && customer.synced) {
+            database.ref('customers/' + id).remove()
+                .catch(error => console.error('Firebase delete failed:', error));
+        }
+        
+        // Remove from local storage
         customers = customers.filter(c => c.id !== id);
-        saveCustomersToStorage();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
         displayCustomers();
         showToast('Customer deleted successfully');
+    }
+}
+
+// Create customer card
+function createCustomerCard(customer, searchTerm = '') {
+    const customerCard = document.createElement('div');
+    customerCard.className = `customer-card ${customer.synced ? 'synced' : 'not-synced'}`;
+    
+    // Highlight text if search term provided
+    const displayName = searchTerm ? highlightText(customer.name, searchTerm) : customer.name;
+    const displayMobile = searchTerm ? highlightText(customer.mobile, searchTerm) : customer.mobile;
+    const displayAddress = searchTerm ? highlightText(customer.address, searchTerm) : customer.address;
+    const displayCoordinates = customer.coordinates ? 
+        (searchTerm ? highlightText(customer.coordinates, searchTerm) : customer.coordinates) : 
+        'Not provided';
+    
+    // Create photos section HTML
+    let photosHTML = '';
+    if (customer.photos && customer.photos.length > 0) {
+        photosHTML = `
+            <div class="photo-section">
+                <div class="section-label">
+                    <i class="fas fa-camera"></i>
+                    Home Photos (${customer.photos.length})
+                </div>
+                <div class="photo-preview-container">
+                    ${customer.photos.map(photo => `
+                        <div class="photo-preview" onclick="openPhotoModal('${photo.dataUrl}')">
+                            <img src="${photo.dataUrl}" alt="Customer home">
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Create map URL section if available
+    let mapUrlHTML = '';
+    if (customer.mapUrl) {
+        mapUrlHTML = `
+            <div class="info-row">
+                <i class="fas fa-link"></i>
+                <div class="info-content">
+                    <a href="${customer.mapUrl}" target="_blank" class="map-link">
+                        <i class="fas fa-external-link-alt"></i>
+                        Open Map URL
+                    </a>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Sync status badge
+    const syncBadge = customer.synced ? 
+        '<span class="sync-badge synced"><i class="fas fa-cloud"></i> Synced</span>' : 
+        '<span class="sync-badge not-synced"><i class="fas fa-mobile-alt"></i> Local</span>';
+    
+    customerCard.innerHTML = `
+        <div class="customer-header">
+            <i class="fas fa-user-tie"></i>
+            <div class="customer-name">${displayName} ${syncBadge}</div>
+            <button class="share-btn" onclick="showShareMenu(${customer.id})">
+                <i class="fas fa-share-alt"></i>
+                Share
+            </button>
+        </div>
+        
+        <div class="customer-info">
+            <div class="info-row">
+                <i class="fas fa-mobile-alt"></i>
+                <div class="info-content">
+                    <div class="mobile-clickable" onclick="showActionSheet('${customer.name}', '${customer.mobile}')">
+                        +91-${displayMobile}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-row">
+                <i class="fas fa-map-marker-alt"></i>
+                <div class="info-content">${displayAddress}</div>
+            </div>
+            
+            <div class="info-row">
+                <i class="fas fa-location-dot"></i>
+                <div class="info-content">${displayCoordinates}</div>
+            </div>
+            
+            ${mapUrlHTML}
+        </div>
+        
+        ${photosHTML}
+        
+        <div class="customer-backup-info">
+            <div class="backup-timestamp">
+                <i class="fas fa-calendar"></i>
+                Added: ${new Date(customer.created).toLocaleDateString()}
+            </div>
+            <div class="backup-actions">
+                <button class="backup-action-btn" onclick="forceSyncCustomer(${customer.id})" title="Force sync">
+                    <i class="fas fa-sync"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="card-actions">
+            <button class="card-btn map-btn" onclick="viewOnMap('${customer.coordinates}')">
+                <i class="fas fa-map"></i>
+                Map
+            </button>
+            <button class="card-btn edit-btn" onclick="editCustomer(${customer.id})">
+                <i class="fas fa-edit"></i>
+                Edit
+            </button>
+            <button class="card-btn delete-btn" onclick="deleteCustomer(${customer.id})">
+                <i class="fas fa-trash"></i>
+                Delete
+            </button>
+        </div>
+    `;
+    
+    return customerCard;
+}
+
+// Force sync individual customer
+async function forceSyncCustomer(id) {
+    const customer = customers.find(c => c.id === id);
+    if (!customer) return;
+    
+    if (!isOnline) {
+        showToast('📱 Offline - Cannot sync');
+        return;
+    }
+    
+    try {
+        await saveToFirebase(customer);
+        customer.synced = true;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+        displayCustomers();
+        showToast(`✅ ${customer.name} synced to cloud!`);
+    } catch (error) {
+        showToast(`❌ Failed to sync ${customer.name}`);
     }
 }
 
@@ -402,97 +733,11 @@ function displayCustomers() {
     }
     
     customers.forEach(customer => {
-        const customerCard = document.createElement('div');
-        customerCard.className = 'customer-card';
-        
-        // Create photos section HTML
-        let photosHTML = '';
-        if (customer.photos && customer.photos.length > 0) {
-            photosHTML = `
-                <div class="photo-section">
-                    <div class="section-label">
-                        <i class="fas fa-camera"></i>
-                        Home Photos (${customer.photos.length})
-                    </div>
-                    <div class="photo-preview-container">
-                        ${customer.photos.map(photo => `
-                            <div class="photo-preview" onclick="openPhotoModal('${photo.dataUrl}')">
-                                <img src="${photo.dataUrl}" alt="Customer home">
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Create map URL section if available
-        let mapUrlHTML = '';
-        if (customer.mapUrl) {
-            mapUrlHTML = `
-                <div class="info-row">
-                    <i class="fas fa-link"></i>
-                    <div class="info-content">
-                        <a href="${customer.mapUrl}" target="_blank" class="map-link">
-                            <i class="fas fa-external-link-alt"></i>
-                            Open Map URL
-                        </a>
-                    </div>
-                </div>
-            `;
-        }
-        
-        customerCard.innerHTML = `
-            <div class="customer-header">
-                <i class="fas fa-user-tie"></i>
-                <div class="customer-name">${customer.name}</div>
-                <button class="share-btn" onclick="showShareMenu(${customer.id})">
-                    <i class="fas fa-share-alt"></i>
-                    Share
-                </button>
-            </div>
-            
-            <div class="customer-info">
-                <div class="info-row">
-                    <i class="fas fa-mobile-alt"></i>
-                    <div class="info-content">
-                        <div class="mobile-clickable" onclick="showActionSheet('${customer.name}', '${customer.mobile}')">
-                            +91-${customer.mobile}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="info-row">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <div class="info-content">${customer.address}</div>
-                </div>
-                
-                <div class="info-row">
-                    <i class="fas fa-location-dot"></i>
-                    <div class="info-content">${customer.coordinates}</div>
-                </div>
-                
-                ${mapUrlHTML}
-            </div>
-            
-            ${photosHTML}
-            
-            <div class="card-actions">
-                <button class="card-btn map-btn" onclick="viewOnMap('${customer.coordinates}')">
-                    <i class="fas fa-map"></i>
-                    Map
-                </button>
-                <button class="card-btn edit-btn" onclick="editCustomer(${customer.id})">
-                    <i class="fas fa-edit"></i>
-                    Edit
-                </button>
-                <button class="card-btn delete-btn" onclick="deleteCustomer(${customer.id})">
-                    <i class="fas fa-trash"></i>
-                    Delete
-                </button>
-            </div>
-        `;
+        const customerCard = createCustomerCard(customer);
         customersList.appendChild(customerCard);
     });
+    
+    updateSyncButton();
 }
 
 // Update customer count
@@ -1248,7 +1493,6 @@ document.addEventListener('keydown', function(e) {
     
     // Escape key to close modals
     if (e.key === 'Escape') {
-        closeBackupModal();
         closePhotoModal();
         closeActionSheet();
         const shareOverlay = document.querySelector('.share-overlay');
