@@ -6,6 +6,10 @@
     <title>Customer Manager</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    
+    <!-- FIREBASE CDN ADD KAREIN -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js"></script>
 </head>
 <body data-theme="light">
     <!-- Fixed Header -->
@@ -30,6 +34,9 @@
         <div class="content-wrapper">
             <!-- Add Customer Section -->
             <section id="add-customer" class="section active">
+                <!-- BACKUP STATUS ADD KAREIN -->
+                <div id="backupStatus" class="backup-status"></div>
+                
                 <form id="customer-form" class="customer-form">
                     <div class="input-group">
                         <i class="fas fa-user"></i>
@@ -107,6 +114,23 @@
                         Add Customer
                     </button>
                 </form>
+                
+                <!-- BACKUP CONTROLS ADD KAREIN -->
+                <div class="backup-controls">
+                    <button type="button" class="sync-btn" onclick="syncData()">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        Sync to Cloud
+                    </button>
+                    <button type="button" class="export-btn" onclick="exportData()">
+                        <i class="fas fa-download"></i>
+                        Export Data
+                    </button>
+                    <button type="button" class="import-btn" onclick="importData()">
+                        <i class="fas fa-upload"></i>
+                        Import Data
+                    </button>
+                </div>
+                
                 <button type="button" class="clear-btn" onclick="clearForm()">
                     <i class="fas fa-broom"></i>
                     Clear Form
