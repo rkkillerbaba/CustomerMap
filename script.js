@@ -9,9 +9,35 @@ const firebaseConfig = {
     appId: "1:358444673079:web:cc2cc41959ba26f3c1f7b2"
 };
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+// Initialize Firebase (optional - works even if Firebase is not available)
+let database = null;
+let isFirebaseEnabled = false;
+
+try {
+    if (typeof firebase !== 'undefined') {
+        // For older SDKs with apps list
+        if (firebase.apps && !firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        } else if (!firebase.apps) {
+            // For SDKs without apps array, just try initialize
+            firebase.initializeApp(firebaseConfig);
+        }
+        
+        if (typeof firebase.database === 'function') {
+            database = firebase.database();
+            isFirebaseEnabled = true;
+            console.log('✅ Firebase enabled, cloud backup active');
+        } else {
+            console.warn('⚠️ firebase.database() not available. Running in local-only mode.');
+        }
+    } else {
+        console.warn('⚠️ Firebase SDK not loaded. Running in local-only mode.');
+    }
+} catch (err) {
+    console.error('❌ Firebase initialization failed. Running in local-only mode.', err);
+    database = null;
+    isFirebaseEnabled = false;
+}
 
 // ==================== DATA STORAGE SYSTEM ====================
 const STORAGE_KEY = 'customerManagerData';
@@ -91,8 +117,8 @@ async function saveCustomerWithBackup(customerData) {
     customerData.synced = false;
     customerData.lastSyncAttempt = new Date().toISOString();
     
-    // Try Firebase first if online
-    if (isOnline) {
+    // Try Firebase first if online *and* Firebase is actually working
+    if (isOnline && isFirebaseEnabled) {
         const saved = await saveToFirebase(customerData);
         if (saved) {
             customerData.synced = true;
@@ -106,6 +132,10 @@ async function saveCustomerWithBackup(customerData) {
 
 // Save to Firebase
 async function saveToFirebase(customerData) {
+    // If Firebase is not configured, just skip cloud save
+    if (!isFirebaseEnabled || !database) {
+        return false;
+    }
     try {
         const customerId = customerData.id.toString();
         await database.ref('customers/' + customerId).set(customerData);
@@ -166,6 +196,11 @@ async function loadCustomers() {
 
 // Sync from Firebase
 async function syncFromFirebase() {
+    // If Firebase is not available, do nothing (app will still work locally)
+    if (!isFirebaseEnabled || !database) {
+        showBackupStatus('Cloud sync is disabled (Firebase not configured)', 'warning');
+        return;
+    }
     try {
         const snapshot = await database.ref('customers').once('value');
         const firebaseCustomers = snapshot.val();
@@ -328,6 +363,16 @@ function showBackupStatus(message, type) {
 // Update sync button state
 function updateSyncButton() {
     const syncBtn = document.querySelector('.sync-btn');
+    if (!syncBtn) return;
+
+    // If Firebase is off, disable sync button
+    if (!isFirebaseEnabled) {
+        syncBtn.innerHTML = `<i class="fas fa-cloud-slash"></i> Cloud Backup Off`;
+        syncBtn.classList.remove('pulse');
+        syncBtn.disabled = true;
+        return;
+    }
+
     const unsyncedCount = customers.filter(c => !c.synced).length;
     
     if (unsyncedCount > 0) {
@@ -554,7 +599,7 @@ function deleteCustomer(id) {
     if (confirm('Are you sure you want to delete this customer? This action cannot be undone.')) {
         // Remove from Firebase if online and synced
         const customer = customers.find(c => c.id === id);
-        if (isOnline && customer && customer.synced) {
+        if (isOnline && customer && customer.synced && isFirebaseEnabled && database) {
             database.ref('customers/' + id).remove()
                 .catch(error => console.error('Firebase delete failed:', error));
         }
@@ -894,7 +939,7 @@ function showShareMenu(customerId) {
                         <div class="share-icon sms">
                             <i class="fas fa-sms"></i>
                         </div>
-                        <span>SMS</span>
+                            <span>SMS</span>
                     </div>
                     
                     <div class="share-option" onclick="shareViaEmail(${JSON.stringify(customer).replace(/"/g, '&quot;')}); closeShareMenu()">
